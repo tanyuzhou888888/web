@@ -1,90 +1,56 @@
-# This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and run tests across different versions of node
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs
-
 name: Node.js CI
-
 on:
-  push:
-    branches: ["master"]
-
+push:
+branches: ["master"]
 env:
-  AWS_REGION: ap-southeast-1                      # set this to your preferred AWS region, e.g. us-west-1
-  ECR_REPOSITORY: course                          # set this to your Amazon ECR repository name
-  ECS_SERVICE: course-web                         # set this to your Amazon ECS service name
-  ECS_CLUSTER: yourEcsCluster                     # set this to your Amazon ECS cluster name
-  ECS_TASK_DEFINITION: yourTaskDefinitionFileName # set this to the path to your Amazon ECS task definition file, e.g. task-definition.json
-  CONTAINER_NAME: yourContainerName
-
+DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [ 16.x]
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 16
-      
-      - name: Install pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 7.9.0
-          run_install: false
-      
-      - name: Get pnpm store directory
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-      
-      - uses: actions/cache@v3
-        name: Setup pnpm cache
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-     
-      - name: Install dependencies
-        run: pnpm install
-     
-      - name: Build Project
-        run: pnpm build
-     
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@0e613a0980cbf65ed5b322eb7a1e075d28913a83
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@62f4f872db3836360b72999f4b87f1ff13310f3a
+build:
+runs-on: ubuntu-latest
+strategy:
+matrix:
+node-version: [ 16.x]
+steps:
+- uses: actions/checkout@v3
+- name: Install Node.js
+uses: actions/setup-node@v3
+with:
+node-version: 16
+sql_more
+复制
+  - name: Install pnpm
+    uses: pnpm/action-setup@v2
+    with:
+      version: 7.9.0
+      run_install: false
+  
+  - name: Get pnpm store directory
+    shell: bash
+    run: |
+      echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+  
+  - uses: actions/cache@v3
+    name: Setup pnpm cache
+    with:
+      path: ${{ env.STORE_PATH }}
+      key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+      restore-keys: |
+        ${{ runner.os }}-pnpm-store-
  
-      - name: Build, tag, and push image to Amazon ECR A
-        id: build-course-web-image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
-          PROJECT_NAME: course-web
-        run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$PROJECT_NAME-latest .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$PROJECT_NAME-latest
-          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$PROJECT_NAME-latest" >> "$GITHUB_OUTPUT"
+  - name: Install dependencies
+    run: pnpm install
  
-      - name: AWS SSM Send-Command A
-        uses: peterkimzz/aws-ssm-send-command@master
-        id: deploy-course-web-ssm
-        with:
-          aws-region: ${{ env.AWS_REGION }}
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          instance-ids: ${{ secrets.INSTANCE_ID }}
-          working-directory: /home/course/course-web
-          command: |
-            docker-compose pull
-            docker-compose down
-            docker-compose up -d
+  - name: Build Project
+    run: pnpm build
+ 
+  - name: Login to DockerHub
+    uses: docker/login-action@v1
+    with:
+      username: ${{ env.DOCKER_USERNAME }}
+      password: ${{ env.DOCKER_PASSWORD }}
+ 
+  - name: Build and push Docker image
+    run: |
+      docker build -t $DOCKER_USERNAME/repository-name:latest .
+      docker push $DOCKER_USERNAME/repository-name:latest
