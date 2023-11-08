@@ -17,8 +17,6 @@ steps:
 uses: actions/setup-node@v3
 with:
 node-version: 16
-sql_more
-复制
   - name: Install pnpm
     uses: pnpm/action-setup@v2
     with:
